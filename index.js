@@ -1,7 +1,4 @@
-const API_KEY = '3b85bff172787a1251e3f8d9a1d3275a';
-const baseUrl = 'http://api.weatherstack.com';
-// const link = `${baseUrl}/current?access_key=${API_KEY}`;
-const link = 'http://api.weatherstack.com/current?access_key=3b85bff172787a1251e3f8d9a1d3275a';
+const proxyLink = 'https://weather-app-proxy.onrender.com';
 
 const WEATHER_PROP = {
     CLOUD: 'CLOUD',
@@ -64,27 +61,25 @@ let state = {
     },
 };
 
-const fetchDataSuccess = ({
-    current: {
-        temperature,
-        observation_time,
-        weather_descriptions,
-        is_day,
-        pressure,
-        cloudcover,
-        humidity,
-        visibility,
-        uv_index: uvindex,
-        wind_speed: windSpeed,
-    },
-    location: { name: city },
+const setState = ({
+    temperature,
+    observation_time: observationTime,
+    weather_descriptions: weatherDescriptions,
+    is_day,
+    pressure,
+    cloudcover,
+    humidity,
+    visibility,
+    uv_index: uvIndex,
+    wind_speed: windSpeed,
+    location: city,
 }) => {
     state = {
         ...state,
         city,
         temperature,
-        observationTime: observation_time,
-        weatherDescriptions: weather_descriptions,
+        observationTime,
+        weatherDescriptions,
         isDay: is_day === 'yes',
         properties: {
             [WEATHER_PROP.CLOUD]: {
@@ -105,7 +100,7 @@ const fetchDataSuccess = ({
             },
             [WEATHER_PROP.UV_INDEX]: {
                 ...state.properties[WEATHER_PROP.UV_INDEX],
-                value: `${uvindex} of 10`,
+                value: `${uvIndex} of 10`,
             },
             [WEATHER_PROP.WIND]: {
                 ...state.properties[WEATHER_PROP.WIND],
@@ -113,21 +108,18 @@ const fetchDataSuccess = ({
             },
         },
     };
-
-    renderApp();
-    handleSearchInput();
 };
 
-const fetchData = async (request = 'London') => {
-    try {
-        const query = localStorage.getItem('city') || request;
-        const response = await fetch(`${link}&query=${query}`);
-        const data = await response.json();
+const fetchData = async (city = 'Kiev') => {
+    const response = await fetch(`${proxyLink}?query=${city}`);
 
-        if (data) fetchDataSuccess(data);
-    } catch (err) {
-        console.log(err);
+    if (response.status === 400) {
+        console.log(response.statusText);
+        return false;
     }
+
+    const data = await response.json();
+    return data;
 };
 
 const getWeatherImage = currentDescription => {
@@ -199,56 +191,71 @@ const renderApp = () => {
     const root = document.getElementById('root');
     root.innerHTML = getMarkup();
 
-    const button = document.getElementById('city');
-
-    if (button) {
-        button.addEventListener('click', toggleFormState);
-    }
+    const cityLabel = document.getElementById('city');
+    cityLabel && cityLabel.addEventListener('click', toggleFormState);
 };
+
+function addEventListeners() {
+    const input = document.getElementById('text-input');
+    const closeButton = document.getElementById('close');
+    const searchForm = document.getElementById('form');
+
+    input && input.addEventListener('input', inputText);
+    closeButton && closeButton.addEventListener('click', toggleFormState);
+    searchForm && searchForm.addEventListener('submit', submitForm);
+}
+
+function removeEventListeners() {
+    const input = document.getElementById('text-input');
+    const closeButton = document.getElementById('close');
+    const searchForm = document.getElementById('form');
+
+    input && input.removeEventListener('input', inputText);
+    closeButton && closeButton.removeEventListener('click', toggleFormState);
+    searchForm && searchForm.removeEventListener('submit', submitForm);
+}
 
 const toggleFormState = () => {
     const popup = document.getElementById('popup');
+    const isSearchFormOpen = popup.classList.value.includes('active');
+
+    if (isSearchFormOpen) {
+        removeEventListeners();
+    } else {
+        addEventListeners();
+    }
+
     popup && popup.classList.toggle(SEARCH_STATE.ACTIVE);
 };
 
-const handleSearchInput = () => {
-    const textInput = document.getElementById('text-input');
-    const closeButton = document.getElementById('close');
+function inputText({ target: { name, value } }) {
+    state = {
+        ...state,
+        [name]: value,
+    };
+}
 
-    if (textInput) {
-        textInput.value = state.city;
-        textInput.addEventListener('input', ({ target: { name, value } }) => {
-            state = {
-                ...state,
-                [name]: value,
-            };
-        });
+async function submitForm(e) {
+    e.preventDefault();
+
+    const currentCity = state.city;
+
+    const data = await fetchData(currentCity);
+    if (data) {
+        localStorage.setItem('city', currentCity);
+        setState(data);
+        renderApp();
     }
 
-    if (closeButton) {
-        closeButton.addEventListener('click', toggleFormState);
-    }
+    toggleFormState();
+    e.target.reset();
+}
+
+const weatherApp = async () => {
+    const city = localStorage.getItem('city');
+    const data = await fetchData(city);
+    setState(data);
+    renderApp();
 };
 
-const handleSearchForm = () => {
-    const form = document.getElementById('form');
-
-    if (form) {
-        form.addEventListener('submit', e => {
-            e.preventDefault();
-
-            const currentCity = state.city;
-            if (!currentCity) return null;
-
-            const req = localStorage.getItem('city');
-            if (req === state.city) return;
-
-            localStorage.setItem('city', currentCity);
-            fetchData(currentCity);
-            toggleFormState();
-        });
-    }
-};
-
-fetchData();
-handleSearchForm();
+weatherApp();
