@@ -110,7 +110,8 @@ const setState = ({
     };
 };
 
-const fetchData = async (city = 'Kiev') => {
+const fetchData = async city => {
+    !city && (city = 'Kiev');
     const response = await fetch(`${proxyLink}?query=${city}`);
 
     if (response.status === 400) {
@@ -252,7 +253,7 @@ async function submitForm(e) {
 }
 
 const weatherApp = async () => {
-    const city = localStorage.getItem('city');
+    const city = localStorage.getItem('city') ? localStorage.getItem('city') : 'Kiev';
     const data = await fetchData(city);
     setState(data);
     renderApp();
